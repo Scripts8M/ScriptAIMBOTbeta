@@ -86,7 +86,7 @@ end
 local function softLookAt(targetPos)
 	local camCF = Cam.CFrame
 	local dir = (targetPos - camCF.Position).Unit
-	local newCF = CFrame.lookAt(camCF.Position, camCF.Position + dir)
+	local newCF = CFrame.lookAt(camCF.Position, Cam.CFrame.Position + dir)
 	Cam.CFrame = camCF:Lerp(newCF, 0.22)
 end
 
@@ -112,6 +112,12 @@ RunService.RenderStepped:Connect(function()
 		return
 	end
 
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") then
+			applyHighlight(plr.Character)
+		end
+	end
+
 	local newTarget = getClosestTarget()
 
 	if currentTarget and currentTarget ~= newTarget then
@@ -121,7 +127,6 @@ RunService.RenderStepped:Connect(function()
 	currentTarget = newTarget
 
 	if currentTarget then
-		applyHighlight(currentTarget)
 		softLookAt(currentTarget.Head.Position)
 	end
 end)
@@ -131,7 +136,7 @@ gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 260, 0, 200)
+frame.Size = UDim2.new(0, 260, 0, 230)
 frame.Position = UDim2.new(0.05, 0, 0.4, 0)
 frame.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 frame.BorderSizePixel = 0
@@ -183,7 +188,7 @@ title.Font = Enum.Font.GothamBold
 title.Parent = frame
 
 local fovLabel = Instance.new("TextLabel")
-fovLabel.Size = UDim2.new(1, -20, 0, 30)
+fovLabel.Size = UDim2.new(1, -20, 0, 25)
 fovLabel.Position = UDim2.new(0, 10, 0, 45)
 fovLabel.BackgroundTransparency = 1
 fovLabel.Text = "FOV: " .. FOV
@@ -192,55 +197,31 @@ fovLabel.TextScaled = true
 fovLabel.Font = Enum.Font.Gotham
 fovLabel.Parent = frame
 
-local sliderBackground = Instance.new("Frame")
-sliderBackground.Size = UDim2.new(1, -40, 0, 20)
-sliderBackground.Position = UDim2.new(0, 20, 0, 80)
-sliderBackground.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
-sliderBackground.BorderSizePixel = 0
-sliderBackground.Parent = frame
+local fovInput = Instance.new("TextBox")
+fovInput.Size = UDim2.new(0, 100, 0, 30)
+fovInput.Position = UDim2.new(0, 10, 0, 75)
+fovInput.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
+fovInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+fovInput.TextScaled = true
+fovInput.Font = Enum.Font.Gotham
+fovInput.Text = tostring(FOV)
+fovInput.ClearTextOnFocus = false
+fovInput.Parent = frame
 
-local sliderCorner = Instance.new("UICorner")
-sliderCorner.CornerRadius = UDim.new(0, 10)
-sliderCorner.Parent = sliderBackground
-
-local sliderFill = Instance.new("Frame")
-sliderFill.Size = UDim2.new(FOV / 200, 0, 1, 0)
-sliderFill.Position = UDim2.new(0, 0, 0, 0)
-sliderFill.BackgroundColor3 = Color3.fromRGB(128, 0, 255)
-sliderFill.BorderSizePixel = 0
-sliderFill.Parent = sliderBackground
-
-local fillCorner = Instance.new("UICorner")
-fillCorner.CornerRadius = UDim.new(0, 10)
-fillCorner.Parent = sliderFill
-
-local sliderDragging = false
-sliderBackground.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		sliderDragging = true
-	end
-end)
-
-UIS.InputChanged:Connect(function(input)
-	if sliderDragging then
-		local mouseX = input.Position.X
-		local posX = math.clamp(mouseX - sliderBackground.AbsolutePosition.X, 0, sliderBackground.AbsoluteSize.X)
-		local percent = posX / sliderBackground.AbsoluteSize.X
-		FOV = math.floor(20 + percent * 180)
+fovInput.FocusLost:Connect(function(enterPressed)
+	local num = tonumber(fovInput.Text)
+	if num and num >= 20 and num <= 200 then
+		FOV = num
 		fovLabel.Text = "FOV: " .. FOV
-		sliderFill.Size = UDim2.new(percent, 0, 1, 0)
-	end
-end)
-
-UIS.InputEnded:Connect(function(input)
-	if sliderDragging then
-		sliderDragging = false
+		circle.Radius = FOV
+	else
+		fovInput.Text = tostring(FOV)
 	end
 end)
 
 local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(1, -40, 0, 50)
-toggleBtn.Position = UDim2.new(0, 20, 0, 120)
+toggleBtn.Size = UDim2.new(1, -20, 0, 50)
+toggleBtn.Position = UDim2.new(0, 10, 0, 120)
 toggleBtn.BackgroundColor3 = Color3.fromRGB(128, 0, 255)
 toggleBtn.BorderSizePixel = 0
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -256,8 +237,12 @@ toggleCorner.Parent = toggleBtn
 toggleBtn.MouseButton1Click:Connect(function()
 	FeatureEnabled = not FeatureEnabled
 	toggleBtn.Text = FeatureEnabled and "Desativar" or "Ativar"
-	if not FeatureEnabled and currentTarget then
-		removeHighlight(currentTarget)
+	if not FeatureEnabled then
+		for _, plr in ipairs(Players:GetPlayers()) do
+			if plr.Character then
+				removeHighlight(plr.Character)
+			end
+		end
 		currentTarget = nil
 	end
 end)
