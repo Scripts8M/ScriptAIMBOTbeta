@@ -8,25 +8,29 @@ local FeatureEnabled = false
 local FOV = 70
 local UpdateInterval = 2
 
-local currentTarget = nil
 local targets = {}
+local currentTarget = nil
 
 local function applyHighlight(character)
-	if not character:FindFirstChild("AIM_HIGHLIGHT") then
+	if not character then return end
+	if not character:FindFirstChild("Highlight_FIX") then
 		local h = Instance.new("Highlight")
-		h.Name = "AIM_HIGHLIGHT"
+		h.Name = "Highlight_FIX"
 		h.FillColor = Color3.fromRGB(255, 0, 255)
 		h.FillTransparency = 0.3
 		h.OutlineColor = Color3.fromRGB(255, 255, 255)
 		h.OutlineTransparency = 0
 		h.Adornee = character
-		h.Parent = character
+		h.Parent = LocalPlayer.PlayerGui
 	end
 end
 
 local function removeHighlight(character)
-	local h = character:FindFirstChild("AIM_HIGHLIGHT")
-	if h then h:Destroy() end
+	if not character then return end
+	local h = LocalPlayer.PlayerGui:FindFirstChild("Highlight_FIX")
+	if h and h.Adornee == character then
+		h:Destroy()
+	end
 end
 
 local circle = Drawing.new("Circle")
@@ -55,7 +59,7 @@ end
 local function updateTargets()
 	targets = {}
 	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") and not isInvisible(plr.Character) then
+		if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") then
 			table.insert(targets, plr.Character)
 		end
 	end
@@ -79,7 +83,6 @@ local function getClosestTarget()
 			end
 		end
 	end
-
 	return closest
 end
 
@@ -87,17 +90,15 @@ local function softLookAt(targetPos)
 	local camCF = Cam.CFrame
 	local dir = (targetPos - camCF.Position).Unit
 	local newCF = CFrame.lookAt(camCF.Position, Cam.CFrame.Position + dir)
-	Cam.CFrame = camCF:Lerp(newCF, 0.22)
+	Cam.CFrame = camCF:Lerp(newCF, 0.20)
 end
 
 spawn(function()
 	while true do
 		if FeatureEnabled then
 			updateTargets()
-		else
-			targets = {}
 		end
-		wait(UpdateInterval)
+		task.wait(UpdateInterval)
 	end
 end)
 
@@ -113,7 +114,7 @@ RunService.RenderStepped:Connect(function()
 	end
 
 	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") then
+		if plr ~= LocalPlayer and plr.Character then
 			applyHighlight(plr.Character)
 		end
 	end
@@ -136,113 +137,84 @@ gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 260, 0, 230)
+frame.Size = UDim2.new(0, 260, 0, 210)
 frame.Position = UDim2.new(0.05, 0, 0.4, 0)
-frame.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+frame.BackgroundColor3 = Color3.fromRGB(45,45,50)
 frame.BorderSizePixel = 0
-frame.ClipsDescendants = true
 frame.Parent = gui
 
-local uiCorner = Instance.new("UICorner")
-uiCorner.CornerRadius = UDim.new(0, 14)
-uiCorner.Parent = frame
-
-local dragging = false
-local dragStart = Vector2.new()
-local startPos = UDim2.new()
-
-frame.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		dragging = true
-		dragStart = input.Position
-		startPos = frame.Position
-	end
-end)
-
-UIS.InputChanged:Connect(function(input)
-	if dragging then
-		local delta = input.Position - dragStart
-		frame.Position = UDim2.new(
-			startPos.X.Scale,
-			startPos.X.Offset + delta.X,
-			startPos.Y.Scale,
-			startPos.Y.Offset + delta.Y
-		)
-	end
-end)
-
-UIS.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		dragging = false
-	end
-end)
+local c = Instance.new("UICorner")
+c.CornerRadius = UDim.new(0, 14)
+c.Parent = frame
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
-title.Position = UDim2.new(0, 0, 0, 0)
+title.Size = UDim2.new(1,0,0,30)
 title.BackgroundTransparency = 1
 title.Text = "Controle de FOV e Mira"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextColor3 = Color3.fromRGB(255,255,255)
 title.TextScaled = true
 title.Font = Enum.Font.GothamBold
 title.Parent = frame
 
 local fovLabel = Instance.new("TextLabel")
-fovLabel.Size = UDim2.new(1, -20, 0, 25)
-fovLabel.Position = UDim2.new(0, 10, 0, 45)
+fovLabel.Size = UDim2.new(1,-20,0,25)
+fovLabel.Position = UDim2.new(0,10,0,40)
 fovLabel.BackgroundTransparency = 1
 fovLabel.Text = "FOV: " .. FOV
-fovLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+fovLabel.TextColor3 = Color3.fromRGB(200,200,200)
 fovLabel.TextScaled = true
 fovLabel.Font = Enum.Font.Gotham
 fovLabel.Parent = frame
 
 local fovInput = Instance.new("TextBox")
-fovInput.Size = UDim2.new(0, 100, 0, 30)
-fovInput.Position = UDim2.new(0, 10, 0, 75)
-fovInput.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
-fovInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+fovInput.Size = UDim2.new(0,120,0,35)
+fovInput.Position = UDim2.new(0,10,0,75)
+fovInput.BackgroundColor3 = Color3.fromRGB(60,60,65)
+fovInput.TextColor3 = Color3.fromRGB(255,255,255)
 fovInput.TextScaled = true
-fovInput.Font = Enum.Font.Gotham
+fovInput.Font = Enum.Font.GothamMedium
 fovInput.Text = tostring(FOV)
 fovInput.ClearTextOnFocus = false
 fovInput.Parent = frame
 
-fovInput.FocusLost:Connect(function(enterPressed)
-	local num = tonumber(fovInput.Text)
-	if num and num >= 20 and num <= 200 then
-		FOV = num
+local c2 = Instance.new("UICorner")
+c2.CornerRadius = UDim.new(0, 10)
+c2.Parent = fovInput
+
+fovInput.FocusLost:Connect(function(enter)
+	local n = tonumber(fovInput.Text)
+	if n and n >= 20 and n <= 300 then
+		FOV = n
 		fovLabel.Text = "FOV: " .. FOV
-		circle.Radius = FOV
 	else
-		fovInput.Text = tostring(FOV)
+		fovInput.Text = FOV
 	end
 end)
 
 local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(1, -20, 0, 50)
-toggleBtn.Position = UDim2.new(0, 10, 0, 120)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(128, 0, 255)
-toggleBtn.BorderSizePixel = 0
-toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Size = UDim2.new(1,-20,0,50)
+toggleBtn.Position = UDim2.new(0,10,0,130)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(128,0,255)
+toggleBtn.TextColor3 = Color3.fromRGB(255,255,255)
 toggleBtn.TextScaled = true
 toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.Text = "Ativar"
 toggleBtn.Parent = frame
 
-local toggleCorner = Instance.new("UICorner")
-toggleCorner.CornerRadius = UDim.new(0, 14)
-toggleCorner.Parent = toggleBtn
+local tCorner = Instance.new("UICorner")
+tCorner.CornerRadius = UDim.new(0, 12)
+tCorner.Parent = toggleBtn
 
 toggleBtn.MouseButton1Click:Connect(function()
 	FeatureEnabled = not FeatureEnabled
 	toggleBtn.Text = FeatureEnabled and "Desativar" or "Ativar"
+
 	if not FeatureEnabled then
-		for _, plr in ipairs(Players:GetPlayers()) do
-			if plr.Character then
-				removeHighlight(plr.Character)
+		currentTarget = nil
+		for _, p in ipairs(Players:GetPlayers()) do
+			if p.Character then
+				removeHighlight(p.Character)
 			end
 		end
-		currentTarget = nil
 	end
 end)
