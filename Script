@@ -8,31 +8,9 @@ local FeatureEnabled = false
 local FOV = 70
 local UpdateInterval = 2
 
-local targets = {}
 local currentTarget = nil
 
-local function applyHighlight(character)
-	if not character then return end
-	if not character:FindFirstChild("Highlight_FIX") then
-		local h = Instance.new("Highlight")
-		h.Name = "Highlight_FIX"
-		h.FillColor = Color3.fromRGB(255, 0, 255)
-		h.FillTransparency = 0.3
-		h.OutlineColor = Color3.fromRGB(255, 255, 255)
-		h.OutlineTransparency = 0
-		h.Adornee = character
-		h.Parent = LocalPlayer.PlayerGui
-	end
-end
-
-local function removeHighlight(character)
-	if not character then return end
-	local h = LocalPlayer.PlayerGui:FindFirstChild("Highlight_FIX")
-	if h and h.Adornee == character then
-		h:Destroy()
-	end
-end
-
+-- Circle Drawing
 local circle = Drawing.new("Circle")
 circle.Visible = false
 circle.Thickness = 3
@@ -47,38 +25,53 @@ local function updateCircle()
 	circle.Visible = FeatureEnabled
 end
 
-local function isInvisible(character)
-	for _, v in ipairs(character:GetDescendants()) do
-		if v:IsA("BasePart") and v.Transparency < 0.9 then
-			return false
-		end
+-- Highlight Functions
+local function applyHighlight(character)
+	if not character or not character:IsDescendantOf(workspace) then return end
+	if not LocalPlayer.PlayerGui:FindFirstChild("Highlight_"..character.Name) then
+		local h = Instance.new("Highlight")
+		h.Name = "Highlight_"..character.Name
+		h.FillColor = Color3.fromRGB(255, 0, 255)
+		h.FillTransparency = 0.3
+		h.OutlineColor = Color3.fromRGB(255, 255, 255)
+		h.OutlineTransparency = 0
+		h.Adornee = character
+		h.Parent = LocalPlayer.PlayerGui
 	end
-	return true
 end
 
-local function updateTargets()
-	targets = {}
+local function removeAllHighlights()
+	for _, child in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
+		if child:IsA("Highlight") and child.Name:match("^Highlight_") then
+			child:Destroy()
+		end
+	end
+end
+
+-- Update highlights para todos os players exceto localplayer
+local function updateAllHighlights()
+	removeAllHighlights()
 	for _, plr in ipairs(Players:GetPlayers()) do
 		if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") then
-			table.insert(targets, plr.Character)
+			applyHighlight(plr.Character)
 		end
 	end
 end
 
+-- Target mais próximo no FOV
 local function getClosestTarget()
 	local closest = nil
 	local minDist = math.huge
 	local center = Cam.ViewportSize / 2
-
-	for _, char in ipairs(targets) do
-		local head = char:FindFirstChild("Head")
-		if head then
-			local pos, vis = Cam:WorldToViewportPoint(head.Position)
-			if vis then
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") then
+			local head = plr.Character.Head
+			local pos, visible = Cam:WorldToViewportPoint(head.Position)
+			if visible then
 				local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
 				if dist < FOV and dist < minDist then
 					minDist = dist
-					closest = char
+					closest = plr.Character
 				end
 			end
 		end
@@ -89,29 +82,18 @@ end
 local function softLookAt(targetPos)
 	local camCF = Cam.CFrame
 	local dir = (targetPos - camCF.Position).Unit
-	local newCF = CFrame.lookAt(camCF.Position, Cam.CFrame.Position + dir)
-	Cam.CFrame = camCF:Lerp(newCF, 0.20)
+	local newCF = CFrame.lookAt(camCF.Position, camCF.Position + dir)
+	Cam.CFrame = camCF:Lerp(newCF, 0.22)
 end
 
-local function refreshHighlights()
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p ~= LocalPlayer and p.Character then
-			removeHighlight(p.Character)
-		end
-	end
-
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p ~= LocalPlayer and p.Character then
-			applyHighlight(p.Character)
-		end
-	end
-end
-
-spawn(function()
+-- Atualização periódica para "reiniciar" mas manter estado e config
+task.spawn(function()
 	while true do
 		if FeatureEnabled then
-			updateTargets()
-			refreshHighlights()
+			updateAllHighlights()
+		else
+			removeAllHighlights()
+			currentTarget = nil
 		end
 		task.wait(UpdateInterval)
 	end
@@ -120,18 +102,12 @@ end)
 RunService.RenderStepped:Connect(function()
 	updateCircle()
 
-	if not FeatureEnabled then
-		if currentTarget then
-			removeHighlight(currentTarget)
-			currentTarget = nil
-		end
-		return
-	end
+	if not FeatureEnabled then return end
 
 	local newTarget = getClosestTarget()
 
 	if currentTarget and currentTarget ~= newTarget then
-		removeHighlight(currentTarget)
+		currentTarget = newTarget
 	end
 
 	currentTarget = newTarget
@@ -141,6 +117,8 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
+-- GUI Setup
+
 local gui = Instance.new("ScreenGui")
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 gui.ResetOnSpawn = false
@@ -148,82 +126,92 @@ gui.ResetOnSpawn = false
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 260, 0, 210)
 frame.Position = UDim2.new(0.05, 0, 0.4, 0)
-frame.BackgroundColor3 = Color3.fromRGB(45,45,50)
+frame.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 frame.BorderSizePixel = 0
 frame.Parent = gui
 
-local c = Instance.new("UICorner")
-c.CornerRadius = UDim.new(0, 14)
-c.Parent = frame
+local uicorner = Instance.new("UICorner")
+uicorner.CornerRadius = UDim.new(0, 14)
+uicorner.Parent = frame
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1,0,0,30)
+title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
 title.Text = "Controle de FOV e Mira"
-title.TextColor3 = Color3.fromRGB(255,255,255)
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextScaled = true
 title.Font = Enum.Font.GothamBold
 title.Parent = frame
 
 local fovLabel = Instance.new("TextLabel")
-fovLabel.Size = UDim2.new(1,-20,0,25)
-fovLabel.Position = UDim2.new(0,10,0,40)
+fovLabel.Size = UDim2.new(1, -20, 0, 25)
+fovLabel.Position = UDim2.new(0, 10, 0, 40)
 fovLabel.BackgroundTransparency = 1
 fovLabel.Text = "FOV: " .. FOV
-fovLabel.TextColor3 = Color3.fromRGB(200,200,200)
+fovLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 fovLabel.TextScaled = true
 fovLabel.Font = Enum.Font.Gotham
 fovLabel.Parent = frame
 
 local fovInput = Instance.new("TextBox")
-fovInput.Size = UDim2.new(0,120,0,35)
-fovInput.Position = UDim2.new(0,10,0,75)
-fovInput.BackgroundColor3 = Color3.fromRGB(60,60,65)
-fovInput.TextColor3 = Color3.fromRGB(255,255,255)
+fovInput.Size = UDim2.new(0, 120, 0, 35)
+fovInput.Position = UDim2.new(0, 10, 0, 75)
+fovInput.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+fovInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 fovInput.TextScaled = true
 fovInput.Font = Enum.Font.GothamMedium
 fovInput.Text = tostring(FOV)
 fovInput.ClearTextOnFocus = false
 fovInput.Parent = frame
 
-local c2 = Instance.new("UICorner")
-c2.CornerRadius = UDim.new(0, 10)
-c2.Parent = fovInput
+local uicorner2 = Instance.new("UICorner")
+uicorner2.CornerRadius = UDim.new(0, 10)
+uicorner2.Parent = fovInput
 
-fovInput.FocusLost:Connect(function(enter)
+local function updateFOVFromInput()
 	local n = tonumber(fovInput.Text)
 	if n and n >= 20 and n <= 300 then
 		FOV = n
 		fovLabel.Text = "FOV: " .. FOV
+		circle.Radius = FOV
 	else
-		fovInput.Text = FOV
+		fovInput.Text = tostring(FOV)
+	end
+end
+
+fovInput.FocusLost:Connect(function(enterPressed)
+	if enterPressed then
+		updateFOVFromInput()
 	end
 end)
 
+fovInput.Changed:Connect(function()
+	-- opcional: atualiza em tempo real ao digitar
+	-- updateFOVFromInput()
+end)
+
 local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(1,-20,0,50)
-toggleBtn.Position = UDim2.new(0,10,0,130)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(128,0,255)
-toggleBtn.TextColor3 = Color3.fromRGB(255,255,255)
+toggleBtn.Size = UDim2.new(1, -20, 0, 50)
+toggleBtn.Position = UDim2.new(0, 10, 0, 130)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(128, 0, 255)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.TextScaled = true
 toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.Text = "Ativar"
 toggleBtn.Parent = frame
 
-local tCorner = Instance.new("UICorner")
-tCorner.CornerRadius = UDim.new(0, 12)
-tCorner.Parent = toggleBtn
+local uicorner3 = Instance.new("UICorner")
+uicorner3.CornerRadius = UDim.new(0, 12)
+uicorner3.Parent = toggleBtn
 
 toggleBtn.MouseButton1Click:Connect(function()
 	FeatureEnabled = not FeatureEnabled
 	toggleBtn.Text = FeatureEnabled and "Desativar" or "Ativar"
-
-	if not FeatureEnabled then
+	if FeatureEnabled then
+		updateAllHighlights()
+	else
+		removeAllHighlights()
 		currentTarget = nil
-		for _, p in ipairs(Players:GetPlayers()) do
-			if p.Character then
-				removeHighlight(p.Character)
-			end
-		end
 	end
+	updateCircle()
 end)
