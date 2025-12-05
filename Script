@@ -9,20 +9,15 @@ local FOV = 70
 
 local circle = Drawing.new("Circle")
 circle.Visible = false
-circle.Thickness = 2
-circle.Color = Color3.fromRGB(200, 80, 255)
+circle.Thickness = 3
+circle.Color = Color3.fromRGB(128, 0, 255)
 circle.Filled = false
 circle.Radius = FOV
-circle.Transparency = 0.8
+circle.Transparency = 0.7
 
 local function updateCircle()
-	circle.Position = Cam.ViewportSize / 2
+	circle.Position = Cam.ViewportSize/2
 	circle.Radius = FOV
-	circle.Visible = FeatureEnabled
-end
-
-local function ToggleFeature()
-	FeatureEnabled = not FeatureEnabled
 	circle.Visible = FeatureEnabled
 end
 
@@ -37,61 +32,127 @@ gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 220, 0, 170)
-frame.Position = UDim2.new(0.05, 0, 0.4, 0)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-frame.BackgroundTransparency = 0.2
+frame.Size = UDim2.new(0, 250, 0, 180)
+frame.Position = UDim2.new(0.05,0,0.4,0)
+frame.BackgroundColor3 = Color3.fromRGB(45,45,50)
+frame.BackgroundTransparency = 0
+frame.BorderSizePixel = 0
 frame.Parent = gui
+frame.ClipsDescendants = true
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0,12)
+uiCorner.Parent = frame
 
 local dragging = false
-local dragStart, startPos
+local dragStart = Vector2.new()
+local startPos = UDim2.new()
 
-frame.InputBegan:Connect(function(i)
-	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+frame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		dragging = true
-		dragStart = i.Position
+		dragStart = input.Position
 		startPos = frame.Position
 	end
 end)
 
-UIS.InputChanged:Connect(function(i)
-	if dragging and (i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseMovement) then
-		local delta = i.Position - dragStart
-		frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+UIS.InputChanged:Connect(function(input)
+	if dragging then
+		local delta = input.Position - dragStart
+		frame.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
 	end
 end)
 
-UIS.InputEnded:Connect(function()
-	dragging = false
+UIS.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = false
+	end
 end)
 
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,0,30)
+title.Position = UDim2.new(0,0,0,0)
+title.BackgroundTransparency = 1
+title.Text = "Controle de FOV"
+title.TextColor3 = Color3.fromRGB(255,255,255)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Parent = frame
+
 local fovLabel = Instance.new("TextLabel")
-fovLabel.Size = UDim2.new(1, -20, 0, 30)
-fovLabel.Position = UDim2.new(0, 10, 0, 10)
+fovLabel.Size = UDim2.new(1,-20,0,30)
+fovLabel.Position = UDim2.new(0,10,0,40)
 fovLabel.BackgroundTransparency = 1
 fovLabel.Text = "FOV: "..FOV
-fovLabel.TextColor3 = Color3.new(1,1,1)
+fovLabel.TextColor3 = Color3.fromRGB(200,200,200)
 fovLabel.TextScaled = true
+fovLabel.Font = Enum.Font.Gotham
 fovLabel.Parent = frame
 
-local fovBtn = Instance.new("TextButton")
-fovBtn.Size = UDim2.new(1, -20, 0, 40)
-fovBtn.Position = UDim2.new(0, 10, 0, 50)
-fovBtn.Text = "Aumentar FOV"
-fovBtn.Parent = frame
+local sliderBackground = Instance.new("Frame")
+sliderBackground.Size = UDim2.new(1,-40,0,20)
+sliderBackground.Position = UDim2.new(0,20,0,75)
+sliderBackground.BackgroundColor3 = Color3.fromRGB(70,70,75)
+sliderBackground.BorderSizePixel = 0
+sliderBackground.Parent = frame
+local sliderCorner = Instance.new("UICorner")
+sliderCorner.CornerRadius = UDim.new(0,10)
+sliderCorner.Parent = sliderBackground
 
-fovBtn.MouseButton1Click:Connect(function()
-	FOV = math.clamp(FOV + 5, 20, 200)
-	fovLabel.Text = "FOV: "..FOV
+local sliderFill = Instance.new("Frame")
+sliderFill.Size = UDim2.new(FOV/200,0,1,0)
+sliderFill.Position = UDim2.new(0,0,0,0)
+sliderFill.BackgroundColor3 = Color3.fromRGB(128,0,255)
+sliderFill.BorderSizePixel = 0
+sliderFill.Parent = sliderBackground
+local fillCorner = Instance.new("UICorner")
+fillCorner.CornerRadius = UDim.new(0,10)
+fillCorner.Parent = sliderFill
+
+local sliderDragging = false
+sliderBackground.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		sliderDragging = true
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if sliderDragging then
+		local mouseX = input.Position.X
+		local posX = math.clamp(mouseX - sliderBackground.AbsolutePosition.X, 0, sliderBackground.AbsoluteSize.X)
+		local percent = posX / sliderBackground.AbsoluteSize.X
+		FOV = math.floor(20 + percent*180)
+		sliderFill.Size = UDim2.new(percent,0,1,0)
+		fovLabel.Text = "FOV: "..FOV
+	end
+end)
+
+UIS.InputEnded:Connect(function(input)
+	if sliderDragging then
+		sliderDragging = false
+	end
 end)
 
 local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(1, -20, 0, 50)
-toggleBtn.Position = UDim2.new(0, 10, 0, 110)
+toggleBtn.Size = UDim2.new(1,-40,0,40)
+toggleBtn.Position = UDim2.new(0,20,0,115)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(128,0,255)
+toggleBtn.BorderSizePixel = 0
+toggleBtn.TextColor3 = Color3.fromRGB(255,255,255)
+toggleBtn.TextScaled = true
+toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.Text = "Ativar"
 toggleBtn.Parent = frame
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(0,12)
+toggleCorner.Parent = toggleBtn
 
 toggleBtn.MouseButton1Click:Connect(function()
-	ToggleFeature()
+	FeatureEnabled = not FeatureEnabled
 	toggleBtn.Text = FeatureEnabled and "Desativar" or "Ativar"
 end)
