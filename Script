@@ -93,10 +93,25 @@ local function softLookAt(targetPos)
 	Cam.CFrame = camCF:Lerp(newCF, 0.20)
 end
 
+local function refreshHighlights()
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer and p.Character then
+			removeHighlight(p.Character)
+		end
+	end
+
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer and p.Character then
+			applyHighlight(p.Character)
+		end
+	end
+end
+
 spawn(function()
 	while true do
 		if FeatureEnabled then
 			updateTargets()
+			refreshHighlights()
 		end
 		task.wait(UpdateInterval)
 	end
@@ -111,12 +126,6 @@ RunService.RenderStepped:Connect(function()
 			currentTarget = nil
 		end
 		return
-	end
-
-	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr ~= LocalPlayer and plr.Character then
-			applyHighlight(plr.Character)
-		end
 	end
 
 	local newTarget = getClosestTarget()
