@@ -1,29 +1,128 @@
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
 local Cam = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
 local FeatureEnabled = false
 local FOV = 70
+local UpdateInterval = 2
+
+local currentTarget = nil
+local targets = {}
+
+local function applyHighlight(character)
+	if not character:FindFirstChild("AIM_HIGHLIGHT") then
+		local h = Instance.new("Highlight")
+		h.Name = "AIM_HIGHLIGHT"
+		h.FillColor = Color3.fromRGB(255, 0, 255)
+		h.FillTransparency = 0.3
+		h.OutlineColor = Color3.fromRGB(255, 255, 255)
+		h.OutlineTransparency = 0
+		h.Adornee = character
+		h.Parent = character
+	end
+end
+
+local function removeHighlight(character)
+	local h = character:FindFirstChild("AIM_HIGHLIGHT")
+	if h then h:Destroy() end
+end
 
 local circle = Drawing.new("Circle")
 circle.Visible = false
 circle.Thickness = 3
 circle.Color = Color3.fromRGB(128, 0, 255)
 circle.Filled = false
-circle.Radius = FOV
 circle.Transparency = 0.7
+circle.Radius = FOV
 
 local function updateCircle()
-	circle.Position = Cam.ViewportSize/2
+	circle.Position = Cam.ViewportSize / 2
 	circle.Radius = FOV
 	circle.Visible = FeatureEnabled
 end
 
+local function isInvisible(character)
+	for _, v in ipairs(character:GetDescendants()) do
+		if v:IsA("BasePart") and v.Transparency < 0.9 then
+			return false
+		end
+	end
+	return true
+end
+
+local function updateTargets()
+	targets = {}
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") and not isInvisible(plr.Character) then
+			table.insert(targets, plr.Character)
+		end
+	end
+end
+
+local function getClosestTarget()
+	local closest = nil
+	local minDist = math.huge
+	local center = Cam.ViewportSize / 2
+
+	for _, char in ipairs(targets) do
+		local head = char:FindFirstChild("Head")
+		if head then
+			local pos, vis = Cam:WorldToViewportPoint(head.Position)
+			if vis then
+				local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+				if dist < FOV and dist < minDist then
+					minDist = dist
+					closest = char
+				end
+			end
+		end
+	end
+
+	return closest
+end
+
+local function softLookAt(targetPos)
+	local camCF = Cam.CFrame
+	local dir = (targetPos - camCF.Position).Unit
+	local newCF = CFrame.lookAt(camCF.Position, camCF.Position + dir)
+	Cam.CFrame = camCF:Lerp(newCF, 0.22)
+end
+
+spawn(function()
+	while true do
+		if FeatureEnabled then
+			updateTargets()
+		else
+			targets = {}
+		end
+		wait(UpdateInterval)
+	end
+end)
+
 RunService.RenderStepped:Connect(function()
-	if FeatureEnabled then
-		updateCircle()
+	updateCircle()
+
+	if not FeatureEnabled then
+		if currentTarget then
+			removeHighlight(currentTarget)
+			currentTarget = nil
+		end
+		return
+	end
+
+	local newTarget = getClosestTarget()
+
+	if currentTarget and currentTarget ~= newTarget then
+		removeHighlight(currentTarget)
+	end
+
+	currentTarget = newTarget
+
+	if currentTarget then
+		applyHighlight(currentTarget)
+		softLookAt(currentTarget.Head.Position)
 	end
 end)
 
@@ -32,16 +131,15 @@ gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 250, 0, 180)
-frame.Position = UDim2.new(0.05,0,0.4,0)
-frame.BackgroundColor3 = Color3.fromRGB(45,45,50)
-frame.BackgroundTransparency = 0
+frame.Size = UDim2.new(0, 260, 0, 200)
+frame.Position = UDim2.new(0.05, 0, 0.4, 0)
+frame.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 frame.BorderSizePixel = 0
-frame.Parent = gui
 frame.ClipsDescendants = true
+frame.Parent = gui
 
 local uiCorner = Instance.new("UICorner")
-uiCorner.CornerRadius = UDim.new(0,12)
+uiCorner.CornerRadius = UDim.new(0, 14)
 uiCorner.Parent = frame
 
 local dragging = false
@@ -75,43 +173,45 @@ UIS.InputEnded:Connect(function(input)
 end)
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1,0,0,30)
-title.Position = UDim2.new(0,0,0,0)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Position = UDim2.new(0, 0, 0, 0)
 title.BackgroundTransparency = 1
-title.Text = "Controle de FOV"
-title.TextColor3 = Color3.fromRGB(255,255,255)
+title.Text = "Controle de FOV e Mira"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextScaled = true
 title.Font = Enum.Font.GothamBold
 title.Parent = frame
 
 local fovLabel = Instance.new("TextLabel")
-fovLabel.Size = UDim2.new(1,-20,0,30)
-fovLabel.Position = UDim2.new(0,10,0,40)
+fovLabel.Size = UDim2.new(1, -20, 0, 30)
+fovLabel.Position = UDim2.new(0, 10, 0, 45)
 fovLabel.BackgroundTransparency = 1
-fovLabel.Text = "FOV: "..FOV
-fovLabel.TextColor3 = Color3.fromRGB(200,200,200)
+fovLabel.Text = "FOV: " .. FOV
+fovLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 fovLabel.TextScaled = true
 fovLabel.Font = Enum.Font.Gotham
 fovLabel.Parent = frame
 
 local sliderBackground = Instance.new("Frame")
-sliderBackground.Size = UDim2.new(1,-40,0,20)
-sliderBackground.Position = UDim2.new(0,20,0,75)
-sliderBackground.BackgroundColor3 = Color3.fromRGB(70,70,75)
+sliderBackground.Size = UDim2.new(1, -40, 0, 20)
+sliderBackground.Position = UDim2.new(0, 20, 0, 80)
+sliderBackground.BackgroundColor3 = Color3.fromRGB(70, 70, 75)
 sliderBackground.BorderSizePixel = 0
 sliderBackground.Parent = frame
+
 local sliderCorner = Instance.new("UICorner")
-sliderCorner.CornerRadius = UDim.new(0,10)
+sliderCorner.CornerRadius = UDim.new(0, 10)
 sliderCorner.Parent = sliderBackground
 
 local sliderFill = Instance.new("Frame")
-sliderFill.Size = UDim2.new(FOV/200,0,1,0)
-sliderFill.Position = UDim2.new(0,0,0,0)
-sliderFill.BackgroundColor3 = Color3.fromRGB(128,0,255)
+sliderFill.Size = UDim2.new(FOV / 200, 0, 1, 0)
+sliderFill.Position = UDim2.new(0, 0, 0, 0)
+sliderFill.BackgroundColor3 = Color3.fromRGB(128, 0, 255)
 sliderFill.BorderSizePixel = 0
 sliderFill.Parent = sliderBackground
+
 local fillCorner = Instance.new("UICorner")
-fillCorner.CornerRadius = UDim.new(0,10)
+fillCorner.CornerRadius = UDim.new(0, 10)
 fillCorner.Parent = sliderFill
 
 local sliderDragging = false
@@ -126,9 +226,9 @@ UIS.InputChanged:Connect(function(input)
 		local mouseX = input.Position.X
 		local posX = math.clamp(mouseX - sliderBackground.AbsolutePosition.X, 0, sliderBackground.AbsoluteSize.X)
 		local percent = posX / sliderBackground.AbsoluteSize.X
-		FOV = math.floor(20 + percent*180)
-		sliderFill.Size = UDim2.new(percent,0,1,0)
-		fovLabel.Text = "FOV: "..FOV
+		FOV = math.floor(20 + percent * 180)
+		fovLabel.Text = "FOV: " .. FOV
+		sliderFill.Size = UDim2.new(percent, 0, 1, 0)
 	end
 end)
 
@@ -139,20 +239,25 @@ UIS.InputEnded:Connect(function(input)
 end)
 
 local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(1,-40,0,40)
-toggleBtn.Position = UDim2.new(0,20,0,115)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(128,0,255)
+toggleBtn.Size = UDim2.new(1, -40, 0, 50)
+toggleBtn.Position = UDim2.new(0, 20, 0, 120)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(128, 0, 255)
 toggleBtn.BorderSizePixel = 0
-toggleBtn.TextColor3 = Color3.fromRGB(255,255,255)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.TextScaled = true
 toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.Text = "Ativar"
 toggleBtn.Parent = frame
+
 local toggleCorner = Instance.new("UICorner")
-toggleCorner.CornerRadius = UDim.new(0,12)
+toggleCorner.CornerRadius = UDim.new(0, 14)
 toggleCorner.Parent = toggleBtn
 
 toggleBtn.MouseButton1Click:Connect(function()
 	FeatureEnabled = not FeatureEnabled
 	toggleBtn.Text = FeatureEnabled and "Desativar" or "Ativar"
+	if not FeatureEnabled and currentTarget then
+		removeHighlight(currentTarget)
+		currentTarget = nil
+	end
 end)
