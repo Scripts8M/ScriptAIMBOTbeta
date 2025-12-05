@@ -1,0 +1,97 @@
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Cam = workspace.CurrentCamera
+
+local FeatureEnabled = false
+local FOV = 70
+
+local circle = Drawing.new("Circle")
+circle.Visible = false
+circle.Thickness = 2
+circle.Color = Color3.fromRGB(200, 80, 255)
+circle.Filled = false
+circle.Radius = FOV
+circle.Transparency = 0.8
+
+local function updateCircle()
+	circle.Position = Cam.ViewportSize / 2
+	circle.Radius = FOV
+	circle.Visible = FeatureEnabled
+end
+
+local function ToggleFeature()
+	FeatureEnabled = not FeatureEnabled
+	circle.Visible = FeatureEnabled
+end
+
+RunService.RenderStepped:Connect(function()
+	if FeatureEnabled then
+		updateCircle()
+	end
+end)
+
+local gui = Instance.new("ScreenGui")
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 220, 0, 170)
+frame.Position = UDim2.new(0.05, 0, 0.4, 0)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BackgroundTransparency = 0.2
+frame.Parent = gui
+
+local dragging = false
+local dragStart, startPos
+
+frame.InputBegan:Connect(function(i)
+	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = i.Position
+		startPos = frame.Position
+	end
+end)
+
+UIS.InputChanged:Connect(function(i)
+	if dragging and (i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseMovement) then
+		local delta = i.Position - dragStart
+		frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+UIS.InputEnded:Connect(function()
+	dragging = false
+end)
+
+local fovLabel = Instance.new("TextLabel")
+fovLabel.Size = UDim2.new(1, -20, 0, 30)
+fovLabel.Position = UDim2.new(0, 10, 0, 10)
+fovLabel.BackgroundTransparency = 1
+fovLabel.Text = "FOV: "..FOV
+fovLabel.TextColor3 = Color3.new(1,1,1)
+fovLabel.TextScaled = true
+fovLabel.Parent = frame
+
+local fovBtn = Instance.new("TextButton")
+fovBtn.Size = UDim2.new(1, -20, 0, 40)
+fovBtn.Position = UDim2.new(0, 10, 0, 50)
+fovBtn.Text = "Aumentar FOV"
+fovBtn.Parent = frame
+
+fovBtn.MouseButton1Click:Connect(function()
+	FOV = math.clamp(FOV + 5, 20, 200)
+	fovLabel.Text = "FOV: "..FOV
+end)
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(1, -20, 0, 50)
+toggleBtn.Position = UDim2.new(0, 10, 0, 110)
+toggleBtn.Text = "Ativar"
+toggleBtn.Parent = frame
+
+toggleBtn.MouseButton1Click:Connect(function()
+	ToggleFeature()
+	toggleBtn.Text = FeatureEnabled and "Desativar" or "Ativar"
+end)
